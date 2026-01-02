@@ -74,28 +74,43 @@ def fetch_player_game_log(player_id: int, season: str) -> dict:
     time.sleep(1.0)
     endpoint = playergamelog.PlayerGameLog(player_id = player_id, season = season)
     return endpoint.get_dict()
+
+    
+def fetch_all_players_game_log(players:list[dict], season: str):
+    
+    for i, player in enumerate(players, start=1):
+        player_id = player["PLAYER_ID"]
+        player_name = player["PLAYER"]
         
+        print(f"[{i}/{len(players)}] Fetching game log for {player_name}")
         
+        try:
+            gamelog = fetch_player_game_log(player_id = player_id, season = season)
+            save_raw(
+                gamelog, 
+                f"gamelog_{season.replace('-', '_')}_{player_id}_{player_name.replace(' ', '_')}"
+            )
+        except Exception as e:
+            print(f"Failed for player:{player_name} ({player_id}): {e}")
+            
+        time.sleep(1.5)
+            
+            
+            
+        
+            
         
         
         
 if __name__ == "__main__":
     season = "2025-26"
 
-    # 1) load newest player id file
+    # Load most recent player ID file
     player_ids_file = newest_raw_file("wizards_player_ids_2025_26")
-    data = load_json(player_ids_file)
-    players = data["players"]
+    players_data = load_json(player_ids_file)
+    players = players_data["players"]
 
-    print("Loaded player IDs from:", player_ids_file)
-    print("Example player:", players[0])
+    print(f"Loaded {len(players)} players from {player_ids_file}")
 
-    # 2) fetch ONE player's game log
-    first_player = players[0]
-    pid = first_player["PLAYER_ID"]
-    pname = first_player["PLAYER"]
-
-    gamelog = fetch_player_game_log(player_id=pid, season=season)
-    out_path = save_raw(gamelog, f"gamelog_{season.replace('-', '_')}_{pid}_{pname.replace(' ', '_')}")
-    print("Saved game log:", out_path)
+    fetch_all_players_game_log(players, season)
     
