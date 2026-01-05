@@ -39,3 +39,6 @@ urllib3==2.6.2
 pandas
 sqlalchemy
 psycopg2-binary
+plotly
+python-dotenv
+statsmodels
