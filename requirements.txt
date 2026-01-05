@@ -42,3 +42,5 @@ psycopg2-binary
 plotly
 python-dotenv
 statsmodels
+joblib
+sklearn
