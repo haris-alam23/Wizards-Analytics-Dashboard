@@ -1,5 +1,7 @@
 # Washington Wizards Analytics Dashboard
 
+[Visit Here](https://wizards-dashboard.streamlit.app/)
+
 This project is an end-to-end data pipeline & analytics dashboard built around Washington Wizards player game data. It combines a structured ETL pipeline, a PostgreSQL database, an interactive Streamlit app, and a simple machine learning model for next game point prediction.
 
 ## What this project does
@@ -68,3 +70,4 @@ wizards-frontoffice/
 - Automate ETL execution with scheduled jobs
 - Add player comparison and season summary views
 - Deploy the dashboard to a cloud platform
+
