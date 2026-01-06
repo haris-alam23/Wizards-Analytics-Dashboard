@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px 
 from db import get_engine
-from queries import PLAYERS_SQL, PLAYER_GAMES_SQL
+from queries import PLAYERS_SQL, PLAYER_GAMES_SQL, SEASONS_SQL
 import plotly.graph_objects as go
 
 
@@ -49,13 +49,20 @@ def load_players() -> pd.DataFrame:
     return pd.read_sql(PLAYERS_SQL, engine)
 
 @st.cache_data(ttl=300)
-def load_player_games(player_id: int) -> pd.DataFrame:
+def load_seasons():
+    engine = get_engine()
+    df = pd.read_sql(SEASONS_SQL, engine)
+    return df["SEASON_ID"].tolist()
+
+def format_season(season_id: int) -> str:
+    year = int(str(season_id)[-4:])
+    return f"{year}–{str(year + 1)[-2:]}"
+
+@st.cache_data(ttl=300)
+def load_player_games(player_id: int, season_id) -> pd.DataFrame:
     
     engine = get_engine()
-    return pd.read_sql(PLAYER_GAMES_SQL, engine, params={"player_id": player_id})
-
-
-
+    return pd.read_sql(PLAYER_GAMES_SQL, engine, params={"player_id": player_id, "season_id": season_id})
 
 
 st.sidebar.header("Filters")
@@ -69,18 +76,59 @@ if name_id_match.empty:
     st.stop()
 player_id = int(name_id_match.iloc[0])
 
+seasons = load_seasons()
+season_map = {format_season(s): s for s in seasons}
+season_choice = st.sidebar.selectbox(
+    "Season",
+    ["All"] + list(season_map.keys()),
+    key="season_choice"
+)
+season_param = None if season_choice == "All" else season_map[season_choice]
 
-df = load_player_games(player_id)
-seasons = sorted(df["SEASON_ID"].dropna().unique().tolist())
-season = st.sidebar.selectbox("Season", seasons) if seasons else None
-if season is not None:
-    df = df[df["SEASON_ID"] == season]
+
+df = load_player_games(player_id, season_param)
+df = df.copy()
+df["TEAM"] = df["MATCHUP"].str.split().str[0]
+
+teams = sorted(df["TEAM"].dropna().unique().tolist())
+
+if season_choice != "All" and teams:
+    if teams == ["WAS"]:
+        pass  
+    elif "WAS" in teams:
+        st.info(
+            f"Note: {name} played for multiple teams this season "
+            f"({', '.join(teams)})."
+        )
+        st.info(
+    f"Note: {name} played for multiple teams this season ({', '.join(teams)})."
+)
+    else:
+        st.warning(
+            f" {name} was not on the Wizards this season "
+            f"(teams: {', '.join(teams)})."
+        )
+
+
 
 df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
+df = df.dropna(subset=["GAME_DATE"])
+if df.empty:
+    st.warning("No games found (after date parsing).")
+    st.stop()
+    
 min_date = df["GAME_DATE"].min()
 max_date = df["GAME_DATE"].max()
+if pd.isna(min_date) or pd.isna(max_date):
+    st.warning("Could not determine date range for the selected filters.")
+    st.stop()
+
 date_range = st.sidebar.date_input("Date Range",value= (min_date.date(), max_date.date()), min_value= min_date.date(),max_value= max_date.date())
-start_date, end_date = date_range
+if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    st.sidebar.info("Select an end date to complete the range.")
+    st.stop()
 df = df[(df["GAME_DATE"].dt.date >= start_date) & (df["GAME_DATE"].dt.date <= end_date)]
 
 st.sidebar.caption(f"{len(df)} games selected")
@@ -88,7 +136,8 @@ if df.empty:
     st.warning("No games found for these filters.")
     st.stop()
     
-    
+st.sidebar.caption("Includes all games (2021-Present) for current Wizards players (may include other teams).")
+
 # Field Goal %
 df["FG_PCT"] = df.apply(lambda r: (r["FGM"] / r["FGA"]) if r["FGA"] else None, axis = 1)
 
@@ -214,7 +263,7 @@ with log_tab:
     table_df["HOME_AWAY"] = table_df["MATCHUP"].apply(lambda x: "Away" if "@" in str(x) else "Home")
 
     preferred_cols = [
-        "GAME_DATE", "SEASON_ID", "MATCHUP", "HOME_AWAY", "WL",
+        "GAME_DATE", "SEASON_ID", "TEAM", "MATCHUP", "HOME_AWAY", "WL",
         "MIN", "PTS", "AST", "REB",
         "FGM", "FGA", "FG3M", "FG3A",
         "FTM", "FTA",
@@ -230,7 +279,7 @@ with log_tab:
             default=display_cols
         )
         
-    table_df = table_df.sort_values("GAME_DATE")
+    table_df = table_df.sort_values("GAME_DATE", ascending=False)
     st.caption(f"{len(table_df)} games shown")
     st.dataframe(
         table_df[selected_cols],

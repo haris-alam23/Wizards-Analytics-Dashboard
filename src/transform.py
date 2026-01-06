@@ -65,20 +65,33 @@ def save_processed_game_logs(df: pd.DataFrame, season: str) -> Path:
 
 
 if __name__ == "__main__":
-    season = "2025-26"
+    seasons_found = sorted({
+        parse_game_log_filename(p)[0].replace("_", "-")  # "2025_26" -> "2025-26"
+        for p in Raw_Dir.glob("gamelog_*.json")
+    })
+    
+    if not seasons_found:
+        raise FileNotFoundError(f"No gamelog_*.json files found in {Raw_Dir}")
 
-    df = parse_all_players_game_log(season)
+    all_dfs = []
+    for season in seasons_found:
+        print(f"\n=== Transforming season {season} ===")
+        df_season = parse_all_players_game_log(season)
+        all_dfs.append(df_season)
+
+    df = pd.concat(all_dfs, ignore_index=True)
     if "Player_ID" in df.columns:
         df = df.drop(columns=["Player_ID"])
         
-    df = df.drop_duplicates(subset=["PLAYER_ID", "Game_ID"])
-
+    game_id_col = "GAME_ID" if "GAME_ID" in df.columns else "Game_ID"
+    df = df.drop_duplicates(subset=["PLAYER_ID", game_id_col])
 
     print("Combined rows:", len(df))
     print("Columns:", list(df.columns))
     print(df.head(5))
 
-    out = save_processed_game_logs(df, season)
+    out = Processed_Dir / "player_game_logs_all_seasons.csv"
+    df.to_csv(out, index=False)
     print("Saved processed game logs to:", out)
 
 

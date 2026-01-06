@@ -1,4 +1,5 @@
 import json
+import argparse
 from pathlib import Path
 from datetime import datetime
 from nba_api.stats.static import teams
@@ -103,14 +104,28 @@ def fetch_all_players_game_log(players:list[dict], season: str):
         
         
 if __name__ == "__main__":
-    season = "2025-26"
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        choices=["backfill", "incremental"],
+        default="incremental",
+        help="backfill = pull multiple seasons, incremental = pull only current season"
+    )
+    args = parser.parse_args()
 
-    # Load most recent player ID file
-    player_ids_file = newest_raw_file("wizards_player_ids_2025_26")
+    prev_seasons = ["2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
+    current_seasons = ["2025-26"]
+    
+    seasons = prev_seasons if args.mode == "backfill" else current_seasons
+
+
+    player_ids_file = newest_raw_file("wizards_player_ids")
     players_data = load_json(player_ids_file)
     players = players_data["players"]
 
     print(f"Loaded {len(players)} players from {player_ids_file}")
 
-    fetch_all_players_game_log(players, season)
-    
+for season in seasons:
+        print(f"\n=== Extracting {season} ===")
+        fetch_all_players_game_log(players, season)    

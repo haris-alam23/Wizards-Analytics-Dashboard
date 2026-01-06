@@ -6,11 +6,11 @@ load_dotenv()
 
 def get_engine():
     
-    host = os.getenv("DB_HOST")
-    port = os.getenv("DB_PORT")
-    name = os.getenv("DB_NAME")
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
+    host = os.getenv("PGHOST")
+    port = os.getenv("PGPORT")
+    name = os.getenv("PGDATABASE")
+    user = os.getenv("PGUSER")
+    password = os.getenv("PGPASSWORD")
     
     url =  f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}"
     return create_engine(url)
