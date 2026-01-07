@@ -15,7 +15,7 @@ This project is an end-to-end data pipeline & analytics dashboard built around W
 ## Tech stack
 
 - Python  
-- PostgreSQL  
+- Neon Postgres  
 - Pandas  
 - SQLAlchemy  
 - Streamlit  
@@ -58,6 +58,18 @@ wizards-frontoffice/
 - Simple next game points prediction based on recent performance
 - Wizards themed user interface
 
+## Deployment
+
+The dashboard is deployed using Streamlit Cloud and connects to a Neon-hosted
+PostgreSQL database.
+
+Database credentials are managed using environment variables:
+- Locally via a `.env` file
+- In production via Streamlit Cloud secrets
+
+The application reads from a production table (`wizards.player_games`)
+populated through a separate CSV ingestion pipeline.
+
 ## Limitations
 - The prediction model is intentionally simple and only predicts points
 - Predictions rely on historical performance and do not account for injuries, matchups, or rotations
@@ -70,4 +82,5 @@ wizards-frontoffice/
 - Automate ETL execution with scheduled jobs
 - Add player comparison and season summary views
 - Deploy the dashboard to a cloud platform
+
 
