@@ -28,7 +28,6 @@ requests==2.32.5
 rpds-py==0.27.1
 six==1.17.0
 smmap==5.0.2
-SQLAlchemy==2.0.45
 streamlit==1.50.0
 tenacity==9.1.2
 toml==0.10.2
@@ -36,11 +35,10 @@ tornado==6.5.4
 typing_extensions==4.15.0
 tzdata==2025.3
 urllib3==2.6.2
-pandas
 sqlalchemy
 psycopg2-binary
 plotly
 python-dotenv
 statsmodels
 joblib
-sklearn
+scikit-learn
