@@ -66,7 +66,7 @@ def save_processed_game_logs(df: pd.DataFrame, season: str) -> Path:
 
 if __name__ == "__main__":
     seasons_found = sorted({
-        parse_game_log_filename(p)[0].replace("_", "-")  
+        parse_game_log_filename(p)[0].replace("_", "-") 
         for p in Raw_Dir.glob("gamelog_*.json")
     })
     

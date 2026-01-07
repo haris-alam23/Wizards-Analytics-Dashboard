@@ -5,8 +5,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, NullPool
 from sqlalchemy.engine import Engine
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 @dataclass(frozen = True)
 class DBConfig: 
@@ -39,8 +42,12 @@ class DBConfig:
 
 def start_engine(cfg: DBConfig) -> Engine:
     url = f"postgresql+psycopg2://{cfg.user}:{cfg.password}@{cfg.host}:{cfg.port}/{cfg.db}"
-    return create_engine(url, future = True)
-
+    return create_engine(
+        url,
+        future=True,
+        poolclass=NullPool,                
+        connect_args={"sslmode": "require"} 
+    )
 
 def read_csv(path: Path) -> pd.DataFrame:
     if not path.exists():
@@ -99,59 +106,42 @@ def write(engine: Engine, df: pd.DataFrame, schema: str, staging_table: str) -> 
     
 
 def upsert_games(engine: Engine, schema: str, staging: str, target: str) -> None: 
-        with engine.begin() as conn:
-            conn.execute(text(f"""
-            CREATE TABLE IF NOT EXISTS {schema}.{target} (
-                LIKE {schema}.{staging} INCLUDING DEFAULTS
+    cols = [
+        "SEASON_ID","GAME_ID","GAME_DATE","MATCHUP","WL","MIN",
+        "FGM","FGA","FG_PCT","FG3M","FG3A","FG3_PCT",
+        "FTM","FTA","FT_PCT","OREB","DREB","REB","AST","STL","BLK",
+        "TOV","PF","PTS","PLUS_MINUS","VIDEO_AVAILABLE",
+        "PLAYER_ID","PLAYER_NAME"
+    ]
+    col_list = ", ".join(f'"{c}"' for c in cols)
+    update_list = ", ".join(
+        f'"{c}" = EXCLUDED."{c}"' for c in cols
+        if c not in ("GAME_ID", "PLAYER_ID")
+    )
+
+    with engine.connect() as conn:
+        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+
+        conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}";'))
+
+        conn.execute(text(f'''
+            CREATE TABLE IF NOT EXISTS "{schema}"."{target}" (
+                LIKE "{schema}"."{staging}" INCLUDING DEFAULTS
             );
-        """))
-            
-            conn.execute(text(f"""
-            DO $$ 
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1
-                    FROM pg_constraint
-                    WHERE conname = '{target}_game_player_ux'
-                ) THEN
-                    ALTER TABLE {schema}.{target}
-                    ADD CONSTRAINT {target}_game_player_ux UNIQUE ("GAME_ID", "PLAYER_ID");
-                END IF;
-            END$$;            
-    """))
-            
-            conn.execute(text(f"""
-            INSERT INTO {schema}.{target}
-            SELECT * FROM {schema}.{staging}
+        '''))
+
+        conn.execute(text(f'''
+            CREATE UNIQUE INDEX IF NOT EXISTS "{target}_game_player_ux"
+            ON "{schema}"."{target}" ("GAME_ID", "PLAYER_ID");
+        '''))
+
+        conn.execute(text(f'''
+            INSERT INTO "{schema}"."{target}" ({col_list})
+            SELECT {col_list}
+            FROM "{schema}"."{staging}"
             ON CONFLICT ("GAME_ID", "PLAYER_ID")
-            DO UPDATE SET
-                "SEASON_ID" = EXCLUDED."SEASON_ID",
-                "GAME_DATE" = EXCLUDED."GAME_DATE",
-                "MATCHUP" = EXCLUDED."MATCHUP",
-                "WL" = EXCLUDED."WL",
-                "MIN" = EXCLUDED."MIN",
-                "FGM" = EXCLUDED."FGM",
-                "FGA" = EXCLUDED."FGA",
-                "FG_PCT" = EXCLUDED."FG_PCT",
-                "FG3M" = EXCLUDED."FG3M",
-                "FG3A" = EXCLUDED."FG3A",
-                "FG3_PCT" = EXCLUDED."FG3_PCT",
-                "FTM" = EXCLUDED."FTM",
-                "FTA" = EXCLUDED."FTA",
-                "FT_PCT" = EXCLUDED."FT_PCT",
-                "OREB" = EXCLUDED."OREB",
-                "DREB" = EXCLUDED."DREB",
-                "REB" = EXCLUDED."REB",
-                "AST" = EXCLUDED."AST",
-                "STL" = EXCLUDED."STL",
-                "BLK" = EXCLUDED."BLK",
-                "TOV" = EXCLUDED."TOV",
-                "PF" = EXCLUDED."PF",
-                "PTS" = EXCLUDED."PTS",
-                "PLUS_MINUS" = EXCLUDED."PLUS_MINUS",
-                "VIDEO_AVAILABLE" = EXCLUDED."VIDEO_AVAILABLE",
-                "PLAYER_NAME" = EXCLUDED."PLAYER_NAME";
-        """))
+            DO UPDATE SET {update_list};
+        '''))    
             
             
 def load_pipeline(csv_path: Path, table_name: str) -> None:
@@ -189,7 +179,9 @@ if __name__ == "__main__":
         args = parse_args()
         load_pipeline(Path(args.csv), args.table)
     except Exception as e:
-        print(f"[load] ❌ error: {e}", file=sys.stderr)
+        import traceback
+        print("[load] ❌ error:", repr(e), file=sys.stderr)
+        traceback.print_exc()
         sys.exit(1)
         
     

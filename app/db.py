@@ -6,12 +6,16 @@ load_dotenv()
 
 def get_engine():
     
-    host = os.getenv("PGHOST")
-    port = os.getenv("PGPORT")
-    name = os.getenv("PGDATABASE")
-    user = os.getenv("PGUSER")
-    password = os.getenv("PGPASSWORD")
     
-    url =  f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}"
-    return create_engine(url)
+    url =  os.environ.get("DATABASE_URL")
+    
+    if not url:
+        raise RuntimeError("DATABASE_URL not set. ")
+    
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    
+    print("DB host:", url.split("@")[1].split("/")[0])
+
+    return create_engine(url, pool_pre_ping= True)
 
